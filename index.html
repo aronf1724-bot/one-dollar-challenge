@@ -1,1 +1,284 @@
-<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>$1 Challenge</title><style>body{font-family:Inter,system-ui,sans-serif;background:#f5f7fb;margin:0;color:#111827}.wrap{max-width:880px;margin:0 auto;padding:48px 20px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:32px;box-shadow:0 10px 30px rgba(0,0,0,.06)}h1{font-size:44px;margin:0 0 12px}.lead{font-size:18px;color:#4b5563;line-height:1.6}.total{font-size:64px;font-weight:800;margin:28px 0 4px}.count{color:#6b7280;margin-bottom:24px}.btn{display:inline-block;padding:14px 20px;border-radius:12px;background:#111827;color:#fff;text-decoration:none;font-weight:700}.mini{margin-top:28px;padding:16px;border-radius:14px;background:#f9fafb;font-size:14px;color:#4b5563}</style></head><body><main class='wrap'><section class='card'><h1>How far can $1 go?</h1><p class='lead'>A transparent experiment: I’m asking people around the world to voluntarily send $1 and seeing how many people participate and how much is collected.</p><div id='total' class='total'>$0.00</div><div id='count' class='count'>0 contributors</div><a class='btn' href='https://paypal.me/Aron1724/1' target='_blank' rel='noopener'>Send $1 on PayPal</a><div class='mini'>Updates happen automatically when the server receives and verifies a successful PayPal payment event.</div></section></main><script>async function refresh(){try{const r=await fetch('/api/stats');const d=await r.json();document.getElementById('total').textContent=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(d.total);document.getElementById('count').textContent=`${d.count} contributor${d.count===1?'':'s'}`;}catch(e){}}refresh();setInterval(refresh,3000);</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>$1 Challenge</title>
+
+  <style>
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: #f5f7fb;
+      margin: 0;
+      color: #111827;
+    }
+
+    .wrap {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 48px 20px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 24px;
+      padding: 32px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    }
+
+    h1 {
+      font-size: 44px;
+      margin: 0 0 12px;
+    }
+
+    .lead {
+      font-size: 18px;
+      color: #4b5563;
+      line-height: 1.6;
+    }
+
+    .total {
+      font-size: 64px;
+      font-weight: 800;
+      margin: 28px 0 4px;
+    }
+
+    .count {
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+
+    .paypal-box {
+      margin-top: 25px;
+    }
+
+    .status {
+      margin-top: 15px;
+      color: #4b5563;
+      font-size: 14px;
+    }
+
+    .mini {
+      margin-top: 28px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #f9fafb;
+      font-size: 14px;
+      color: #4b5563;
+    }
+  </style>
+</head>
+
+<body>
+
+<main class="wrap">
+  <section class="card">
+
+    <h1>How far can $1 go?</h1>
+
+    <p class="lead">
+      A transparent experiment: I’m asking people around the world
+      to voluntarily send $1 and seeing how many people participate
+      and how much is collected.
+    </p>
+
+    <div id="total" class="total">$0.00</div>
+
+    <div id="count" class="count">
+      0 contributors
+    </div>
+
+    <div class="paypal-box">
+      <paypal-button
+        id="paypal-btn"
+        type="pay"
+        hidden>
+      </paypal-button>
+    </div>
+
+    <div id="status" class="status">
+      Loading PayPal...
+    </div>
+
+    <div class="mini">
+      Payments are processed securely by PayPal.
+      The public counter updates after a successful payment is confirmed.
+    </div>
+
+  </section>
+</main>
+
+<script
+  id="paypal-sdk"
+  src="https://www.sandbox.paypal.com/web-sdk/v6/core">
+</script>
+
+<script>
+  async function refreshStats() {
+    try {
+      const response = await fetch("/api/stats");
+      const data = await response.json();
+
+      document.getElementById("total").textContent =
+        new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD"
+        }).format(data.total);
+
+      document.getElementById("count").textContent =
+        `${data.count} contributor${data.count === 1 ? "" : "s"}`;
+
+    } catch (error) {
+      console.error("Stats error:", error);
+    }
+  }
+
+  async function createOrder() {
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not create PayPal order");
+    }
+
+    const data = await response.json();
+
+    return {
+      orderId: data.id
+    };
+  }
+
+  async function captureOrder(orderId) {
+    const response = await fetch(
+      `/api/orders/${orderId}/capture`,
+      {
+        method: "POST"
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not capture PayPal order");
+    }
+
+    return response.json();
+  }
+
+  async function initPayPal() {
+    try {
+      const clientResponse =
+        await fetch("/api/paypal-client-id");
+
+      if (!clientResponse.ok) {
+        throw new Error("Could not load PayPal client ID");
+      }
+
+      const { clientId } =
+        await clientResponse.json();
+
+      const sdk =
+        await window.paypal.createInstance({
+          clientId,
+          components: ["paypal-payments"],
+          pageType: "checkout"
+        });
+
+      const methods =
+        await sdk.findEligibleMethods({
+          currencyCode: "USD"
+        });
+
+      if (!methods.isEligible("paypal")) {
+        document.getElementById("status").textContent =
+          "PayPal is not available for this device/account.";
+        return;
+      }
+
+      const paymentSession =
+        sdk.createPayPalOneTimePaymentSession({
+
+          async onApprove(data) {
+            try {
+              document.getElementById("status").textContent =
+                "Confirming payment...";
+
+              await captureOrder(data.orderId);
+
+              document.getElementById("status").textContent =
+                "Payment completed. Thank you!";
+
+              await refreshStats();
+
+            } catch (error) {
+              console.error(error);
+
+              document.getElementById("status").textContent =
+                "Payment could not be confirmed.";
+            }
+          },
+
+          onCancel() {
+            document.getElementById("status").textContent =
+              "Payment cancelled.";
+          },
+
+          onError(error) {
+            console.error("PayPal error:", error);
+
+            document.getElementById("status").textContent =
+              "Something went wrong with PayPal.";
+          }
+        });
+
+      const button =
+        document.getElementById("paypal-btn");
+
+      button.hidden = false;
+
+      button.addEventListener("click", async () => {
+        try {
+          document.getElementById("status").textContent =
+            "Opening PayPal...";
+
+          await paymentSession.start(
+            { presentationMode: "auto" },
+            createOrder()
+          );
+
+        } catch (error) {
+          console.error(error);
+
+          document.getElementById("status").textContent =
+            "Could not start PayPal payment.";
+        }
+      });
+
+      document.getElementById("status").textContent =
+        "Ready to donate $1.";
+
+    } catch (error) {
+      console.error("PayPal initialization error:", error);
+
+      document.getElementById("status").textContent =
+        "PayPal could not be loaded.";
+    }
+  }
+
+  const sdkScript =
+    document.getElementById("paypal-sdk");
+
+  sdkScript.addEventListener(
+    "load",
+    initPayPal
+  );
+
+  refreshStats();
+  setInterval(refreshStats, 3000);
+</script>
+
+</body>
+</html>
