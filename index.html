@@ -2,117 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>$1 Challenge</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How far can $1 go?</title>
   <style>
-    body {
-      font-family: Inter, system-ui, sans-serif;
-      background: #f5f7fb;
-      margin: 0;
-      color: #111827;
-    }
-
-    .wrap {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 48px 20px;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 24px;
-      padding: 32px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.06);
-    }
-
-    h1 {
-      font-size: 44px;
-      margin: 0 0 12px;
-    }
-
-    .lead {
-      font-size: 18px;
-      color: #4b5563;
-      line-height: 1.6;
-    }
-
-    .total {
-      font-size: 64px;
-      font-weight: 800;
-      margin: 28px 0 4px;
-    }
-
-    .count {
-      color: #6b7280;
-      margin-bottom: 24px;
-    }
-
-    .paypal-box {
-      margin-top: 25px;
-    }
-
-    .status {
-      margin-top: 15px;
-      color: #4b5563;
-      font-size: 14px;
-    }
-
-    .mini {
-      margin-top: 28px;
-      padding: 16px;
-      border-radius: 14px;
-      background: #f9fafb;
-      font-size: 14px;
-      color: #4b5563;
-    }
+    body{font-family:Inter,system-ui,sans-serif;background:#f5f7fb;margin:0;color:#111827}
+    .wrap{max-width:880px;margin:0 auto;padding:48px 20px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:32px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
+    h1{font-size:44px;margin:0 0 12px}
+    .lead{font-size:18px;color:#4b5563;line-height:1.6}
+    .total{font-size:64px;font-weight:800;margin:28px 0 4px}
+    .count{color:#6b7280;margin-bottom:24px}
+    #paypal-button-container{max-width:420px}
+    .status{margin-top:12px;color:#4b5563;font-size:14px}
+    .mini{margin-top:28px;padding:16px;border-radius:14px;background:#f9fafb;font-size:14px;color:#4b5563}
   </style>
 </head>
-
 <body>
-
 <main class="wrap">
   <section class="card">
-
     <h1>How far can $1 go?</h1>
-
     <p class="lead">
-      A transparent experiment: I’m asking people around the world
-      to voluntarily send $1 and seeing how many people participate
-      and how much is collected.
+      A transparent experiment: I’m asking people around the world to
+      voluntarily send $1 and seeing how many people participate and how much is collected.
     </p>
 
     <div id="total" class="total">$0.00</div>
+    <div id="count" class="count">0 contributors</div>
 
-    <div id="count" class="count">
-      0 contributors
-    </div>
-
-    <div class="paypal-box">
-      <paypal-button
-        id="paypal-btn"
-        type="pay"
-        hidden>
-      </paypal-button>
-    </div>
-
-    <div id="status" class="status">
-      Loading PayPal...
-    </div>
+    <div id="paypal-button-container"></div>
+    <div id="status" class="status">Loading PayPal…</div>
 
     <div class="mini">
-      Payments are processed securely by PayPal.
-      The public counter updates after a successful payment is confirmed.
+      Every contribution is voluntary. The public counter updates after a
+      successful PayPal payment is confirmed.
     </div>
-
   </section>
 </main>
-
-<script
-  id="paypal-sdk"
-  src="https://www.sandbox.paypal.com/web-sdk/v6/core">
-</script>
 
 <script>
   async function refreshStats() {
@@ -128,157 +53,108 @@
 
       document.getElementById("count").textContent =
         `${data.count} contributor${data.count === 1 ? "" : "s"}`;
-
     } catch (error) {
       console.error("Stats error:", error);
     }
   }
 
-  async function createOrder() {
-    const response = await fetch("/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error("Could not create PayPal order");
-    }
-
-    const data = await response.json();
-
-    return {
-      orderId: data.id
-    };
-  }
-
-  async function captureOrder(orderId) {
-    const response = await fetch(
-      `/api/orders/${orderId}/capture`,
-      {
-        method: "POST"
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error("Could not capture PayPal order");
-    }
-
-    return response.json();
-  }
-
-  async function initPayPal() {
+  async function loadPayPal() {
     try {
-      const clientResponse =
-        await fetch("/api/paypal-client-id");
+      const response = await fetch("/api/paypal-client-id");
+      const data = await response.json();
 
-      if (!clientResponse.ok) {
-        throw new Error("Could not load PayPal client ID");
+      if (!response.ok || !data.clientId) {
+        throw new Error("PayPal Client ID not configured.");
       }
 
-      const { clientId } =
-        await clientResponse.json();
+      const script = document.createElement("script");
+      script.src =
+        "https://www.sandbox.paypal.com/sdk/js?client-id=" +
+        encodeURIComponent(data.clientId) +
+        "&currency=USD&intent=capture";
 
-      const sdk =
-        await window.paypal.createInstance({
-          clientId,
-          components: ["paypal-payments"],
-          pageType: "checkout"
-        });
-
-      const methods =
-        await sdk.findEligibleMethods({
-          currencyCode: "USD"
-        });
-
-      if (!methods.isEligible("paypal")) {
+      script.onload = renderPayPalButtons;
+      script.onerror = () => {
         document.getElementById("status").textContent =
-          "PayPal is not available for this device/account.";
-        return;
-      }
+          "PayPal could not be loaded.";
+      };
 
-      const paymentSession =
-        sdk.createPayPalOneTimePaymentSession({
+      document.head.appendChild(script);
+    } catch (error) {
+      console.error(error);
+      document.getElementById("status").textContent =
+        "PayPal is not configured yet.";
+    }
+  }
 
-          async onApprove(data) {
-            try {
-              document.getElementById("status").textContent =
-                "Confirming payment...";
+  function renderPayPalButtons() {
+    paypal.Buttons({
+      style: {
+        layout: "vertical",
+        shape: "rect",
+        label: "paypal"
+      },
 
-              await captureOrder(data.orderId);
+      createOrder: async () => {
+        document.getElementById("status").textContent =
+          "Creating payment…";
 
-              document.getElementById("status").textContent =
-                "Payment completed. Thank you!";
-
-              await refreshStats();
-
-            } catch (error) {
-              console.error(error);
-
-              document.getElementById("status").textContent =
-                "Payment could not be confirmed.";
-            }
-          },
-
-          onCancel() {
-            document.getElementById("status").textContent =
-              "Payment cancelled.";
-          },
-
-          onError(error) {
-            console.error("PayPal error:", error);
-
-            document.getElementById("status").textContent =
-              "Something went wrong with PayPal.";
+        const response = await fetch("/api/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
           }
         });
 
-      const button =
-        document.getElementById("paypal-btn");
+        const data = await response.json();
 
-      button.hidden = false;
-
-      button.addEventListener("click", async () => {
-        try {
-          document.getElementById("status").textContent =
-            "Opening PayPal...";
-
-          await paymentSession.start(
-            { presentationMode: "auto" },
-            createOrder()
-          );
-
-        } catch (error) {
-          console.error(error);
-
-          document.getElementById("status").textContent =
-            "Could not start PayPal payment.";
+        if (!response.ok || !data.id) {
+          throw new Error("Could not create PayPal order.");
         }
-      });
 
-      document.getElementById("status").textContent =
-        "Ready to donate $1.";
+        return data.id;
+      },
 
-    } catch (error) {
-      console.error("PayPal initialization error:", error);
+      onApprove: async (data) => {
+        document.getElementById("status").textContent =
+          "Confirming payment…";
 
-      document.getElementById("status").textContent =
-        "PayPal could not be loaded.";
-    }
+        const response = await fetch(
+          "/api/orders/" + encodeURIComponent(data.orderID) + "/capture",
+          { method: "POST" }
+        );
+
+        if (!response.ok) {
+          document.getElementById("status").textContent =
+            "Payment could not be confirmed.";
+          return;
+        }
+
+        document.getElementById("status").textContent =
+          "Payment completed. Thank you!";
+
+        await refreshStats();
+      },
+
+      onCancel: () => {
+        document.getElementById("status").textContent =
+          "Payment cancelled.";
+      },
+
+      onError: (error) => {
+        console.error("PayPal error:", error);
+        document.getElementById("status").textContent =
+          "Something went wrong with PayPal.";
+      }
+    }).render("#paypal-button-container");
+
+    document.getElementById("status").textContent =
+      "Ready to send $1.";
   }
-
-  const sdkScript =
-    document.getElementById("paypal-sdk");
-
-  sdkScript.addEventListener(
-    "load",
-    initPayPal
-  );
 
   refreshStats();
   setInterval(refreshStats, 3000);
+  loadPayPal();
 </script>
-
 </body>
 </html>
