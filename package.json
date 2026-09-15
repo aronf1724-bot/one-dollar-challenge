@@ -1,6 +1,12 @@
 {
-  "name":"one-dollar-challenge-site",
-  "type":"module",
-  "scripts":{"start":"node server.js"},
-  "dependencies":{"dotenv":"latest","express":"latest","socket.io":"latest","sqlite":"latest","sqlite3":"latest"}
+  "name": "one-dollar-challenge-site",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "latest",
+    "express": "latest",
+    "socket.io": "latest"
+  }
 }
